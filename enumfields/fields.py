@@ -34,6 +34,26 @@ class CastOnAssignDescriptor:
         obj.__dict__[self.field.name] = python_value
 
 
+class CastOnSaveDescriptor:
+
+    def __init__(self, field):
+        self.field = field
+
+    def __get__(self, obj, type=None):
+        if type is None:
+            return self
+
+        def save_fnc(update_fields=None, **kwargs):
+            getattr(super(obj.__class__, obj), 'save')(update_fields=update_fields, **kwargs)
+            fields = update_fields or obj._meta.get_fields()
+            for field in fields:
+                if isinstance(field, EnumFieldMixin):
+                    initial_field_name = field.get_initial_cache_name()
+                    obj.__dict__[initial_field_name] = getattr(obj, field.name)
+
+        return save_fnc
+
+
 class EnumFieldValidationMixin:
 
     def get_initial_cache_name(self):
@@ -90,6 +110,7 @@ class EnumFieldMixin(EnumFieldValidationMixin):
     def contribute_to_class(self, cls, name):
         super(EnumFieldMixin, self).contribute_to_class(cls, name)
         setattr(cls, name, CastOnAssignDescriptor(self))
+        setattr(cls, 'save', CastOnSaveDescriptor(self))
 
     def to_python(self, value):
         if value is None or value == '':

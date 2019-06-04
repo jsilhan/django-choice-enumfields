@@ -121,20 +121,34 @@ def test_next_states_enum_field():
 
     with pytest.raises(ValidationError):
         # invalid transition from START to END
-        model.any_first_state = StateFlow.END
+        model.any_first_state = StateFlowAnyFirst.END
         model.full_clean()
 
     model.any_first_state = StateFlowAnyFirst.PROCESSING
     model.full_clean()
 
+    # does not update initial value of any_first_state field
+    model.save(update_fields=['color'])
+    with pytest.raises(ValidationError):
+        # invalid transition from START to END
+        model.any_first_state = StateFlowAnyFirst.END
+        model.full_clean()
+
+    # initial values of fields during save are updated
+    model.any_first_state = StateFlowAnyFirst.PROCESSING
+    model.save()
+    model.any_first_state = StateFlowAnyFirst.END
+    model.full_clean()
+
+    # field values are updated correctly from model loaded from db
     model_from_db = MyModel.objects.get(pk=model.pk)
+    model_from_db.any_first_state = StateFlowAnyFirst.END
+    model_from_db.full_clean()
 
     with pytest.raises(ValidationError):
-        model_from_db.any_first_state = StateFlow.END
+        # invalid transition from PROCESSING to START
+        model_from_db.any_first_state = StateFlowAnyFirst.START
         model_from_db.full_clean()
-
-    model_from_db.any_first_state = StateFlowAnyFirst.PROCESSING
-    model_from_db.full_clean()
 
     MyModel(color=Color.RED, any_first_state=StateFlowAnyFirst.END).full_clean()
 
